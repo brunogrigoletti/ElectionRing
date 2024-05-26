@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sync"
+	"os"
 )
 
 type mensagem struct {
@@ -17,7 +18,7 @@ var (
 		make(chan mensagem),
 		make(chan mensagem),
 	}
-	controle = make(chan int)
+	controle = make(chan int) // Canal externo para forçar falhas
 	wg       sync.WaitGroup
 )
 
@@ -25,27 +26,26 @@ func ElectionControler(in chan int) {
 	defer wg.Done()
 
 	var temp mensagem
+	// O: Encerrar
+	// 1: Iniciar eleição
+	// 2: Falhar
 
-	// Mudar o processo 0 (canal de entrada 3) para falho
-
-	temp.tipo = 2
+	temp.tipo = 2 // Mudar o processo 0 (canal de entrada 3) para falho
 	chans[3] <- temp
 	fmt.Printf("Controle: mudar o processo 0 para falho\n")
-
+	fmt.Printf("Controle: confirmação %d\n", <-in)
+	
+	temp.tipo = 1 // O processo 1 deve iniciar uma eleição
+	chans[1] <- temp
+	fmt.Printf("Controle: processo 0 falhou. Iniciar eleição\n")
 	fmt.Printf("Controle: confirmação %d\n", <-in)
 
-	// Mudar o processo 1 (canal de entrada 0) para falho
-
-	temp.tipo = 2
+	temp.tipo = 0 // Encerrar o script de testes
 	chans[0] <- temp
-	fmt.Printf("Controle: mudar o processo 1 para falho\n")
-	fmt.Printf("Controle: confirmação %d\n", <-in) // receber e imprimir confirmação
-
-	// Matar outrOs processos com mensagens não conhecidas
-
-	temp.tipo = 4
 	chans[1] <- temp
 	chans[2] <- temp
+	chans[3] <- temp
+	fmt.Println("\nTodos os processos pararam. Programa encerrado")
 
 	fmt.Println("\nProcesso controlador concluído\n")
 }
@@ -55,31 +55,47 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 
 	var actualLeader int
 	var bFailed bool = false // Todos inciam sem falha
+	var hardStop bool = false
 
 	actualLeader = leader
 
-	temp := <-in
-	fmt.Printf("%2d: recebi mensagem %d, [ %d, %d, %d ]\n", TaskId, temp.tipo, temp.corpo[0], temp.corpo[1], temp.corpo[2])
+	for !hardStop {
+		temp := <-in
+		fmt.Printf("%2d: recebi mensagem %d, [ %d, %d, %d ]\n", TaskId, temp.tipo, temp.corpo[0], temp.corpo[1], temp.corpo[2])
+		switch temp.tipo {
+			case 0:
+				{
+					fmt.Println("\nPrograma encerrado")
+					controle <- -5
+					hardStop = true
+				}
+			case 2:
+				{
+					bFailed = true
+					fmt.Printf("%2d: falho %v \n", TaskId, bFailed)
 
-	switch temp.tipo {
-	case 2:
-		{
-			bFailed = true
-			fmt.Printf("%2d: falho %v \n", TaskId, bFailed)
-			fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
-			controle <- -5
-		}
-	case 3:
-		{
-			bFailed = false
-			fmt.Printf("%2d: falho %v \n", TaskId, bFailed)
-			fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
-			controle <- -5
-		}
-	default:
-		{
-			fmt.Printf("%2d: não conheço este tipo de mensagem\n", TaskId)
-			fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
+					for i := range chans {
+						fmt.Println(TaskId)
+            			if i != TaskId && i > TaskId {
+						
+            			}
+        			}
+
+					fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
+					controle <- -5
+				}
+			case 3:
+				{
+					bFailed = false
+					fmt.Printf("%2d: falho %v \n", TaskId, bFailed)
+					fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
+					controle <- -5
+				}
+			default:
+				{
+					fmt.Printf("%2d: não conheço este tipo de mensagem\n", TaskId)
+					fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
+				}
 		}
 	}
 
@@ -89,7 +105,7 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 func main() {
 	wg.Add(5)
 
-	go ElectionStage(0, chans[3], chans[0], 0) // Lider
+	go ElectionStage(0, chans[3], chans[0], 0) // Líder
 	go ElectionStage(1, chans[0], chans[1], 0) // Processo 0
 	go ElectionStage(2, chans[1], chans[2], 0) // Processo 0
 	go ElectionStage(3, chans[2], chans[3], 0) // Processo 0
