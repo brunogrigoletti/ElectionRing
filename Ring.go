@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"sync"
-	"os"
 )
 
 type mensagem struct {
@@ -26,17 +25,33 @@ func ElectionControler(in chan int) {
 	defer wg.Done()
 
 	var temp mensagem
-	// O: Encerrar
+	// O: Encerrar programa
 	// 1: Iniciar eleição
-	// 2: Falhar
+	// 2: Falhar processo
+	// 3: Acordar processo
 
 	temp.tipo = 2 // Mudar o processo 0 (canal de entrada 3) para falho
 	chans[3] <- temp
 	fmt.Printf("Controle: mudar o processo 0 para falho\n")
 	fmt.Printf("Controle: confirmação %d\n", <-in)
 	
-	temp.tipo = 1 // O processo 1 deve iniciar uma eleição
-	chans[1] <- temp
+	temp.tipo = 1 // O processo 1 (canal de entrada 0) deve iniciar uma eleição
+	chans[0] <- temp
+	fmt.Printf("Controle: processo 0 falhou. Iniciar eleição\n")
+	fmt.Printf("Controle: confirmação %d\n", <-in)
+
+	temp.tipo = 3 // O processo 0 será re-ativado
+	chans[3] <- temp
+	fmt.Printf("Controle: acordou o processo 0\n")
+	fmt.Printf("Controle: confirmação %d\n", <-in)
+
+	temp.tipo = 1 // O processo 1, atual líder, deve iniciar uma nova eleição
+	chans[0] <- temp
+	fmt.Printf("Controle: processo 0 voltou. Iniciar eleição\n")
+	fmt.Printf("Controle: confirmação %d\n", <-in)
+
+	temp.tipo = 1 // O processo 0 inicia uma eleição sem que qualquer processo tenha falhado
+	chans[3] <- temp
 	fmt.Printf("Controle: processo 0 falhou. Iniciar eleição\n")
 	fmt.Printf("Controle: confirmação %d\n", <-in)
 
@@ -69,25 +84,29 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 					controle <- -5
 					hardStop = true
 				}
+			case 1:
+				{
+					if bFailed {
+						fmt.Printf("%2d: começou eleição\n", TaskId)
+						// Devo criar um novo tipo para a confirmação da eleição?
+						temp.tipo = 'ELEICAO'
+						// Como eu incluo o ID do processo na mensagem?
+						temp.tipo = 'ID'
+						// Como comunicar o resultado?
+						out <- temp
+					}
+				}
 			case 2:
 				{
 					bFailed = true
-					fmt.Printf("%2d: falho %v \n", TaskId, bFailed)
-
-					for i := range chans {
-						fmt.Println(TaskId)
-            			if i != TaskId && i > TaskId {
-						
-            			}
-        			}
-
+					fmt.Printf("%2d: falhou %v\n", TaskId, bFailed)
 					fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
 					controle <- -5
 				}
 			case 3:
 				{
 					bFailed = false
-					fmt.Printf("%2d: falho %v \n", TaskId, bFailed)
+					fmt.Printf("%2d: acordou\n", TaskId)
 					fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
 					controle <- -5
 				}
@@ -106,9 +125,9 @@ func main() {
 	wg.Add(5)
 
 	go ElectionStage(0, chans[3], chans[0], 0) // Líder
-	go ElectionStage(1, chans[0], chans[1], 0) // Processo 0
-	go ElectionStage(2, chans[1], chans[2], 0) // Processo 0
-	go ElectionStage(3, chans[2], chans[3], 0) // Processo 0
+	go ElectionStage(1, chans[0], chans[1], 0) 
+	go ElectionStage(2, chans[1], chans[2], 0) 
+	go ElectionStage(3, chans[2], chans[3], 0)
 
 	fmt.Println("\nAnel de processos criado")
 
