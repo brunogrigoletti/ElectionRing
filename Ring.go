@@ -95,6 +95,7 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 						temp.corpo[TaskId] = TaskId
 						out <- temp
 
+						temp.tipo = 5
 						temp := <-in
 						var newLeader int = temp.corpo[0]
 						for _, p := range temp.corpo {
@@ -102,9 +103,7 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 								newLeader = p
 							}
 						}
-
 						actualLeader = newLeader
-						temp.tipo = 5
 						controle <- -5
 						out <- temp
 					} else {
@@ -129,13 +128,18 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 				}
 			case 4:
 				{
-					temp.corpo[TaskId] = TaskId
-					fmt.Printf("%2d: votou\n", TaskId)
+					if !bFailed{
+						temp.corpo[TaskId] = TaskId
+						fmt.Printf("%2d: votou\n", TaskId)
+					} else {
+						temp.corpo[TaskId] = 99
+						fmt.Printf("%2d: não votou, estava inativo\n", TaskId)
+					}
 					out <- temp
 				}
 			case 5:
 				{
-					actualLeader = 
+					actualLeader = temp.corpo[0]
 					fmt.Printf("%2d: o líder eleito é %d\n", TaskId, actualLeader)
 					out <- temp
 				}
