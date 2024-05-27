@@ -6,18 +6,19 @@ import (
 )
 
 type mensagem struct {
-	tipo  int    // Tipo da mensagem para fazer o controle
-	corpo [3]int // Conteúdo da mensagem (IDs)
+	tipo  int
+	// Tive que mudar de 3 para 4 em razão de uma falha "index out of range" durante um teste. Isso está certo?
+	corpo [4]int
 }
 
 var (
-	chans = []chan mensagem{ // Vetor de canais para formar o anel de eleição
+	chans = []chan mensagem{
 		make(chan mensagem),
 		make(chan mensagem),
 		make(chan mensagem),
 		make(chan mensagem),
 	}
-	controle = make(chan int) // Canal externo para forçar falhas
+	controle = make(chan int)
 	wg       sync.WaitGroup
 )
 
@@ -69,7 +70,7 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 	defer wg.Done()
 
 	var actualLeader int
-	var bFailed bool = false // Todos inciam sem falha
+	var bFailed bool = false
 	var hardStop bool = false
 
 	actualLeader = leader
@@ -80,19 +81,42 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 		switch temp.tipo {
 			case 0:
 				{
+					hardStop = true
 					fmt.Println("\nPrograma encerrado")
 					controle <- -5
-					hardStop = true
 				}
 			case 1:
 				{
-					if bFailed {
+					if !bFailed {
 						fmt.Printf("%2d: começou eleição\n", TaskId)
 						// Devo criar um novo tipo para a confirmação da eleição?
-						temp.tipo = 'ELEICAO'
+						temp.tipo = 1
 						// Como eu incluo o ID do processo na mensagem?
-						temp.tipo = 'ID'
+						temp.corpo[TaskId] = TaskId
 						// Como comunicar o resultado?
+						var newLeader int
+						for i, vote := range temp.corpo {
+							if i != 0 && !bFailed {
+								if vote > leader && (newLeader == 0 || vote < newLeader) {
+									newLeader = vote
+								}
+							} else if i == 0 && !bFailed {
+								if (vote > leader || leader == 0) && (newLeader == 0 || vote < newLeader) {
+									newLeader = vote
+								}
+							} else if vote != 0 && (newLeader == 0 || vote < newLeader) {
+								newLeader = vote
+							}
+						}
+						actualLeader = newLeader
+						fmt.Printf("%2d: eleição concluída. Novo líder é %d\n", TaskId, actualLeader)
+						// Que mensagem eu devo retornar para o controlador nesse caso?
+						controle <- -5
+						out <- temp
+					} else {
+						fmt.Printf("%2d: a eleição não pode ocorrer porque o processo falhou\n", TaskId)
+						// Que mensagem eu devo retornar para o controlador nesse caso?
+						controle <- -5
 						out <- temp
 					}
 				}
