@@ -7,7 +7,6 @@ import (
 
 type mensagem struct {
 	tipo  int
-	// Tive que mudar de 3 para 4 em razão de uma falha "index out of range" durante um teste. Isso está certo?
 	corpo [4]int
 }
 
@@ -79,7 +78,7 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 
 	for !hardStop {
 		temp := <-in
-		fmt.Printf("%2d: recebi mensagem %d, [ %d, %d, %d ]\n", TaskId, temp.tipo, temp.corpo[0], temp.corpo[1], temp.corpo[2])
+		fmt.Printf("%2d: recebi mensagem %d, [ %d, %d, %d, %d ]\n", TaskId, temp.tipo, temp.corpo[0], temp.corpo[1], temp.corpo[2], temp.corpo[3])
 		switch temp.tipo {
 			case 0:
 				{
@@ -94,22 +93,21 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 						temp.tipo = 4
 						temp.corpo[TaskId] = TaskId
 						out <- temp
-
-						temp.tipo = 5
 						temp := <-in
 						var newLeader int = temp.corpo[0]
-						for _, p := range temp.corpo {
-							if !bFailed && p < newLeader {
-								newLeader = p
+						for _, id := range temp.corpo {
+							if id < newLeader {
+								newLeader = id
 							}
 						}
+						temp.tipo = 5
+						temp.corpo[TaskId] = newLeader
 						actualLeader = newLeader
-						controle <- -5
 						out <- temp
+						controle <- -5
 					} else {
 						fmt.Printf("%2d: a eleição não pode ocorrer porque o processo falhou\n", TaskId)
 						controle <- -5
-						out <- temp
 					}
 				}
 			case 2:
@@ -128,7 +126,7 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 				}
 			case 4:
 				{
-					if !bFailed{
+					if !bFailed {
 						temp.corpo[TaskId] = TaskId
 						fmt.Printf("%2d: votou\n", TaskId)
 					} else {
