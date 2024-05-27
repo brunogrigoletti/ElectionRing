@@ -89,25 +89,21 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 				{
 					if !bFailed {
 						fmt.Printf("%2d: começou eleição\n", TaskId)
-						// Devo criar um novo tipo para a confirmação da eleição?
 						temp.tipo = 1
-						// Como eu incluo o ID do processo na mensagem?
+						temp := mensagem{tipo: 1, corpo: [4]int{-1, -1, -1, -1}}
 						temp.corpo[TaskId] = TaskId
-						// Como comunicar o resultado?
-						var newLeader int = temp.corpo[0]
-						for _, vote := range temp.corpo {
-							if !bFailed && vote < newLeader {
-								newLeader = vote
+						out <- temp
+						var newLeader int = temp.corpo[3]
+						for _, p := range temp.corpo {
+							if !bFailed && p < newLeader {
+								newLeader = p
 							}
 						}
 						actualLeader = newLeader
 						fmt.Printf("%2d: eleição concluída. Novo líder é %d\n", TaskId, actualLeader)
-						// Que mensagem eu devo retornar para o controlador nesse caso?
 						controle <- -5
-						out <- temp
 					} else {
 						fmt.Printf("%2d: a eleição não pode ocorrer porque o processo falhou\n", TaskId)
-						// Que mensagem eu devo retornar para o controlador nesse caso?
 						controle <- -5
 						out <- temp
 					}
