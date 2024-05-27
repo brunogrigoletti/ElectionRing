@@ -94,17 +94,9 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 						// Como eu incluo o ID do processo na mensagem?
 						temp.corpo[TaskId] = TaskId
 						// Como comunicar o resultado?
-						var newLeader int
-						for i, vote := range temp.corpo {
-							if i != 0 && !bFailed {
-								if vote > leader && (newLeader == 0 || vote < newLeader) {
-									newLeader = vote
-								}
-							} else if i == 0 && !bFailed {
-								if (vote > leader || leader == 0) && (newLeader == 0 || vote < newLeader) {
-									newLeader = vote
-								}
-							} else if vote != 0 && (newLeader == 0 || vote < newLeader) {
+						var newLeader int = temp.corpo[0]
+						for _, vote := range temp.corpo {
+							if !bFailed && vote < newLeader {
 								newLeader = vote
 							}
 						}
