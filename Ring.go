@@ -30,6 +30,8 @@ func ElectionControler(in chan int) {
 	// 1: Iniciar eleição
 	// 2: Falhar processo
 	// 3: Acordar processo
+	// 4: Votação
+	// 5: Atualizar líder
 
 	temp.tipo = 2 // Mudar o processo 0 (canal de entrada 3) para falho
 	chans[3] <- temp
@@ -89,19 +91,22 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 				{
 					if !bFailed {
 						fmt.Printf("%2d: começou eleição\n", TaskId)
-						temp.tipo = 1
-						temp := mensagem{tipo: 1, corpo: [4]int{-1, -1, -1, -1}}
+						temp.tipo = 4
 						temp.corpo[TaskId] = TaskId
 						out <- temp
-						var newLeader int = temp.corpo[3]
+
+						temp := <-in
+						var newLeader int = temp.corpo[0]
 						for _, p := range temp.corpo {
 							if !bFailed && p < newLeader {
 								newLeader = p
 							}
 						}
+
 						actualLeader = newLeader
-						fmt.Printf("%2d: eleição concluída. Novo líder é %d\n", TaskId, actualLeader)
+						temp.tipo = 5
 						controle <- -5
+						out <- temp
 					} else {
 						fmt.Printf("%2d: a eleição não pode ocorrer porque o processo falhou\n", TaskId)
 						controle <- -5
@@ -112,20 +117,32 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 				{
 					bFailed = true
 					fmt.Printf("%2d: falhou %v\n", TaskId, bFailed)
-					fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
+					fmt.Printf("%2d: líder atual %d\n", TaskId, actualLeader)
 					controle <- -5
 				}
 			case 3:
 				{
 					bFailed = false
 					fmt.Printf("%2d: acordou\n", TaskId)
-					fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
+					fmt.Printf("%2d: líder atual %d\n", TaskId, actualLeader)
 					controle <- -5
+				}
+			case 4:
+				{
+					temp.corpo[TaskId] = TaskId
+					fmt.Printf("%2d: votou\n", TaskId)
+					out <- temp
+				}
+			case 5:
+				{
+					actualLeader = 
+					fmt.Printf("%2d: o líder eleito é %d\n", TaskId, actualLeader)
+					out <- temp
 				}
 			default:
 				{
 					fmt.Printf("%2d: não conheço este tipo de mensagem\n", TaskId)
-					fmt.Printf("%2d: lider atual %d\n", TaskId, actualLeader)
+					fmt.Printf("%2d: líder atual %d\n", TaskId, actualLeader)
 				}
 		}
 	}
