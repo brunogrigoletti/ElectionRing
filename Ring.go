@@ -12,12 +12,12 @@ type mensagem struct {
 
 var (
 	chans = []chan mensagem{
-		make(chan mensagem),
-		make(chan mensagem),
-		make(chan mensagem),
-		make(chan mensagem),
+		make(chan mensagem, 4),
+		make(chan mensagem, 4),
+		make(chan mensagem, 4),
+		make(chan mensagem, 4),
 	}
-	controle = make(chan int)
+	controle = make(chan int, 4)
 	wg       sync.WaitGroup
 )
 
@@ -54,7 +54,7 @@ func ElectionControler(in chan int) {
 
 	temp.tipo = 1 // O processo 0 inicia uma eleição sem que qualquer processo tenha falhado
 	chans[3] <- temp
-	fmt.Printf("Controle: processo 0 falhou. Iniciar eleição\n")
+	fmt.Printf("Controle: iniciar eleição sem que tenha havido falhas\n")
 	fmt.Printf("Controle: confirmação %d\n", <-in)
 
 	temp.tipo = 0 // Encerrar o script de testes
@@ -82,27 +82,38 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 		switch temp.tipo {
 			case 0:
 				{
-					hardStop = true
 					fmt.Println("\nPrograma encerrado")
 					controle <- -5
+					hardStop = true
 				}
 			case 1:
 				{
 					if !bFailed {
+						// Inicia-se a eleição
 						fmt.Printf("%2d: começou eleição\n", TaskId)
 						temp.tipo = 4
 						temp.corpo[TaskId] = TaskId
+
+						// Envia a mensagem de eleição para o próximo processo no anel
 						out <- temp
-						temp := <-in
-						var newLeader int = temp.corpo[0]
-						for _, id := range temp.corpo {
+
+						// Recebe a mensagem de volta do anel
+						received := <-in
+        
+        				// Encontrar o menor ID no corpo da mensagem
+						var newLeader int = received.corpo[0]
+						for _, id := range received.corpo {
 							if id < newLeader {
 								newLeader = id
 							}
 						}
+
+						// Prepara-se a mensagem de novo líder
 						temp.tipo = 5
-						temp.corpo[TaskId] = newLeader
 						actualLeader = newLeader
+						fmt.Printf("%2d: o novo líder eleito é: %d\n", TaskId, actualLeader)
+
+						// Envia a mensagem de novo líder para o próximo processo no anel
 						out <- temp
 						controle <- -5
 					} else {
@@ -114,14 +125,12 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 				{
 					bFailed = true
 					fmt.Printf("%2d: falhou %v\n", TaskId, bFailed)
-					fmt.Printf("%2d: líder atual %d\n", TaskId, actualLeader)
 					controle <- -5
 				}
 			case 3:
 				{
 					bFailed = false
 					fmt.Printf("%2d: acordou\n", TaskId)
-					fmt.Printf("%2d: líder atual %d\n", TaskId, actualLeader)
 					controle <- -5
 				}
 			case 4:
@@ -144,11 +153,9 @@ func ElectionStage(TaskId int, in chan mensagem, out chan mensagem, leader int) 
 			default:
 				{
 					fmt.Printf("%2d: não conheço este tipo de mensagem\n", TaskId)
-					fmt.Printf("%2d: líder atual %d\n", TaskId, actualLeader)
 				}
 		}
 	}
-
 	fmt.Printf("%2d: terminei \n", TaskId)
 }
 
